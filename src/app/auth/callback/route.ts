@@ -4,7 +4,25 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const nextParam = searchParams.get("next") ?? "/dashboard";
+
+  // Validate that `next` is a safe relative path to prevent open redirect attacks
+  const isValidRedirect =
+    nextParam.startsWith("/") &&
+    !nextParam.startsWith("//") &&
+    !nextParam.startsWith("/\\") &&
+    !nextParam.includes("://");
+  const next = isValidRedirect ? nextParam : "/dashboard";
+
+  // Handle OAuth error responses (e.g. user canceled, provider denied)
+  const oauthError = searchParams.get("error");
+  if (oauthError) {
+    const errorDescription =
+      searchParams.get("error_description") ?? "Authentication was canceled or failed.";
+    return NextResponse.redirect(
+      `${origin}/auth?error=${encodeURIComponent(errorDescription)}`
+    );
+  }
 
   if (code) {
     const supabase = await createClient();
@@ -14,6 +32,6 @@ export async function GET(request: Request) {
     }
   }
 
-  // Return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/auth?error=Could+not+authenticate`);
+  // No code and no explicit error — something unexpected happened
+  return NextResponse.redirect(`${origin}/auth?error=${encodeURIComponent("Could not authenticate. Please try again.")}`);
 }
