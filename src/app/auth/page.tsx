@@ -11,10 +11,11 @@ type AuthMode = "login" | "signup" | "reset";
 function AuthForm() {
   const searchParams = useSearchParams();
   const callbackError = searchParams.get("error");
+  const callbackMessage = searchParams.get("message");
 
   const [mode, setMode] = useState<AuthMode>("login");
   const [error, setError] = useState<string | null>(callbackError);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(callbackMessage);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
