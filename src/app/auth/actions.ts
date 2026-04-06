@@ -45,6 +45,10 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
   });
 
   if (error) {
+    // Provide a clear, user-friendly message for common login failures
+    if (error.message === "Invalid login credentials") {
+      return { error: "Invalid email or password. Please try again." };
+    }
     return { error: error.message };
   }
 

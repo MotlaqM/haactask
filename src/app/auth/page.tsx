@@ -74,6 +74,7 @@ function AuthForm() {
         {error && (
           <div
             role="alert"
+            aria-live="assertive"
             className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
           >
             {error}
