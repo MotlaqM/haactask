@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createDefaultUserData } from "@/lib/default-user-data";
 
 export type AuthResult = {
   error?: string;
@@ -17,13 +18,23 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
   });
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Create default user data (Inbox project) for the new user
+  if (data.user) {
+    try {
+      await createDefaultUserData(supabase, data.user.id);
+    } catch (e) {
+      console.error("Failed to create default user data on sign-up:", e);
+      // Don't block sign-up; the dashboard will handle this as a fallback
+    }
   }
 
   redirect("/dashboard");
