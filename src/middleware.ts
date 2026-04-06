@@ -35,18 +35,27 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Helper to copy session cookies from supabaseResponse to a redirect response
+  function createRedirect(url: URL) {
+    const redirectResponse = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return redirectResponse;
+  }
+
   // Redirect root path based on auth state
   if (pathname === "/") {
     const url = request.nextUrl.clone();
     url.pathname = user ? "/dashboard" : "/auth";
-    return NextResponse.redirect(url);
+    return createRedirect(url);
   }
 
   // Redirect unauthenticated users trying to access protected routes
   if (!user && pathname.startsWith("/dashboard")) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth";
-    return NextResponse.redirect(url);
+    return createRedirect(url);
   }
 
   // Redirect authenticated users away from auth page
@@ -59,7 +68,7 @@ export async function middleware(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return createRedirect(url);
   }
 
   return supabaseResponse;
