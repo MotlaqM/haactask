@@ -43,7 +43,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // Redirect authenticated users away from auth page
-  if (user && pathname.startsWith("/auth")) {
+  // Allow access to /auth/update-password and /auth/callback even when authenticated
+  if (
+    user &&
+    pathname.startsWith("/auth") &&
+    !pathname.startsWith("/auth/update-password") &&
+    !pathname.startsWith("/auth/callback")
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
