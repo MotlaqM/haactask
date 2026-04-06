@@ -35,6 +35,13 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Redirect root path based on auth state
+  if (pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = user ? "/dashboard" : "/auth";
+    return NextResponse.redirect(url);
+  }
+
   // Redirect unauthenticated users trying to access protected routes
   if (!user && pathname.startsWith("/dashboard")) {
     const url = request.nextUrl.clone();
@@ -59,5 +66,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/auth/:path*"],
+  matcher: ["/", "/dashboard/:path*", "/auth/:path*"],
 };
