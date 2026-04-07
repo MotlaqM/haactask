@@ -147,54 +147,13 @@ export async function reorderProjects(
     return { error: "You must be signed in." };
   }
 
-  // Verify all projects exist and belong to the user before updating
-  const ids = updates.map((u) => u.id);
-  const { data: existing, error: fetchError } = await supabase
-    .from("projects")
-    .select("id, position")
-    .in("id", ids)
-    .eq("user_id", user.id);
+  // Atomically reorder via Postgres RPC (single transaction with row locking)
+  const { error } = await supabase.rpc("reorder_projects", {
+    updates: JSON.stringify(updates),
+  });
 
-  if (fetchError) {
+  if (error) {
     return { error: "Failed to reorder projects. Please try again." };
-  }
-
-  if (!existing || existing.length !== updates.length) {
-    return { error: "One or more projects not found." };
-  }
-
-  // Store previous positions for rollback
-  const previousPositions = new Map(
-    existing.map((p) => [p.id, p.position as number])
-  );
-
-  // Apply all updates, verifying each affects exactly one row
-  const applied: { id: string; previousPosition: number }[] = [];
-
-  for (const update of updates) {
-    const { data, error } = await supabase
-      .from("projects")
-      .update({ position: update.position })
-      .eq("id", update.id)
-      .eq("user_id", user.id)
-      .select("id");
-
-    if (error || !data || data.length !== 1) {
-      // Rollback previously applied updates
-      for (const done of applied) {
-        await supabase
-          .from("projects")
-          .update({ position: done.previousPosition })
-          .eq("id", done.id)
-          .eq("user_id", user.id);
-      }
-      return { error: "Failed to reorder projects. Please try again." };
-    }
-
-    applied.push({
-      id: update.id,
-      previousPosition: previousPositions.get(update.id)!,
-    });
   }
 
   revalidatePath("/dashboard");
