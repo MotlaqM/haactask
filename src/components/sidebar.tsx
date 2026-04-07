@@ -3,10 +3,10 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Inbox, FolderOpen, Plus, X, Pencil, Archive } from "lucide-react";
+import { Inbox, FolderOpen, Plus, X, Pencil, Archive, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { createProject, updateProject, archiveProject } from "@/app/dashboard/actions";
+import { createProject, updateProject, archiveProject, reorderProjects } from "@/app/dashboard/actions";
 
 const PROJECT_COLORS = [
   "#ef4444", // red
@@ -51,7 +51,16 @@ export function Sidebar({ projects }: { projects: Project[] }) {
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [isArchivePending, startArchiveTransition] = useTransition();
 
-  const activeProjects = projects
+  // Reorder state
+  const [optimisticProjects, setOptimisticProjects] = useState<Project[]>(projects);
+  const [isReorderPending, startReorderTransition] = useTransition();
+
+  // Keep optimistic projects in sync with prop changes
+  useEffect(() => {
+    setOptimisticProjects(projects);
+  }, [projects]);
+
+  const activeProjects = optimisticProjects
     .filter((p) => !p.is_archived)
     .sort((a, b) => {
       // Inbox always first
@@ -160,6 +169,47 @@ export function Sidebar({ projects }: { projects: Project[] }) {
     });
   }
 
+  function handleMoveProject(projectId: string, direction: "up" | "down") {
+    // Get non-inbox active projects sorted by position
+    const nonInbox = optimisticProjects
+      .filter((p) => !p.is_inbox && !p.is_archived)
+      .sort((a, b) => a.position - b.position);
+
+    const currentIndex = nonInbox.findIndex((p) => p.id === projectId);
+    if (currentIndex === -1) return;
+
+    const swapIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (swapIndex < 0 || swapIndex >= nonInbox.length) return;
+
+    const current = nonInbox[currentIndex];
+    const swap = nonInbox[swapIndex];
+
+    // Swap positions
+    const updates = [
+      { id: current.id, position: swap.position },
+      { id: swap.id, position: current.position },
+    ];
+
+    // Optimistic update
+    setOptimisticProjects((prev) =>
+      prev.map((p) => {
+        if (p.id === current.id) return { ...p, position: swap.position };
+        if (p.id === swap.id) return { ...p, position: current.position };
+        return p;
+      })
+    );
+
+    startReorderTransition(async () => {
+      const result = await reorderProjects(updates);
+      if (result.error) {
+        // Rollback on error
+        setOptimisticProjects(projects);
+      } else {
+        router.refresh();
+      }
+    });
+  }
+
   // Focus the edit input when editingProjectId changes
   useEffect(() => {
     if (editingProjectId) {
@@ -256,6 +306,10 @@ export function Sidebar({ projects }: { projects: Project[] }) {
             {activeProjects.map((project) => {
               const isActive = activeProjectId === project.id;
               const isEditing = editingProjectId === project.id;
+              const nonInboxProjects = activeProjects.filter((p) => !p.is_inbox);
+              const nonInboxIndex = nonInboxProjects.findIndex((p) => p.id === project.id);
+              const isFirstNonInbox = nonInboxIndex === 0;
+              const isLastNonInbox = nonInboxIndex === nonInboxProjects.length - 1;
 
               if (isEditing) {
                 return (
@@ -344,6 +398,24 @@ export function Sidebar({ projects }: { projects: Project[] }) {
                     </Link>
                     {!project.is_inbox && (
                       <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => handleMoveProject(project.id, "up")}
+                          disabled={isFirstNonInbox || isReorderPending}
+                          aria-label={`Move ${project.name} up`}
+                        >
+                          <ChevronUp className="size-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => handleMoveProject(project.id, "down")}
+                          disabled={isLastNonInbox || isReorderPending}
+                          aria-label={`Move ${project.name} down`}
+                        >
+                          <ChevronDown className="size-3" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon-xs"

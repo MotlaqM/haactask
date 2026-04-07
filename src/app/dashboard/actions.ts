@@ -109,6 +109,45 @@ export async function updateProject(
   return { error: null };
 }
 
+export async function reorderProjects(
+  updates: { id: string; position: number }[]
+) {
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return { error: "No updates provided." };
+  }
+
+  // Validate no duplicate positions
+  const positions = updates.map((u) => u.position);
+  if (new Set(positions).size !== positions.length) {
+    return { error: "Duplicate positions are not allowed." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in." };
+  }
+
+  // Update each project's position
+  for (const update of updates) {
+    const { error } = await supabase
+      .from("projects")
+      .update({ position: update.position })
+      .eq("id", update.id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      return { error: "Failed to reorder projects. Please try again." };
+    }
+  }
+
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function archiveProject(projectId: string) {
   if (!projectId || projectId.trim().length === 0) {
     return { error: "Project ID is required." };
