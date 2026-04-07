@@ -35,6 +35,8 @@ function AuthForm() {
 
       if (result?.error) {
         setError(result.error);
+      } else if (result?.success) {
+        setSuccess(result.success);
       } else if (mode === "reset") {
         setSuccess("Check your email for a password reset link.");
       }
