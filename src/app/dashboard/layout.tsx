@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createDefaultUserData } from "@/lib/default-user-data";
@@ -41,7 +42,9 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-full flex-1">
-      <Sidebar projects={projects ?? []} />
+      <Suspense>
+        <Sidebar projects={projects ?? []} />
+      </Suspense>
       <main className="flex-1 overflow-y-auto">{children}</main>
     </div>
   );
