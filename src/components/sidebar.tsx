@@ -3,10 +3,10 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Inbox, FolderOpen, Plus, X, Pencil } from "lucide-react";
+import { Inbox, FolderOpen, Plus, X, Pencil, Archive } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { createProject, updateProject } from "@/app/dashboard/actions";
+import { createProject, updateProject, archiveProject } from "@/app/dashboard/actions";
 
 const PROJECT_COLORS = [
   "#ef4444", // red
@@ -46,6 +46,10 @@ export function Sidebar({ projects }: { projects: Project[] }) {
   const [editError, setEditError] = useState<string | null>(null);
   const [isEditPending, startEditTransition] = useTransition();
   const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Archive state
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [isArchivePending, startArchiveTransition] = useTransition();
 
   const activeProjects = projects
     .filter((p) => !p.is_archived)
@@ -140,6 +144,22 @@ export function Sidebar({ projects }: { projects: Project[] }) {
     }
   }
 
+  function handleArchive(projectId: string) {
+    setArchiveError(null);
+    startArchiveTransition(async () => {
+      const result = await archiveProject(projectId);
+      if (result.error) {
+        setArchiveError(result.error);
+      } else {
+        // If the archived project was active, navigate to dashboard
+        if (activeProjectId === projectId) {
+          router.push("/dashboard");
+        }
+        router.refresh();
+      }
+    });
+  }
+
   // Focus the edit input when editingProjectId changes
   useEffect(() => {
     if (editingProjectId) {
@@ -219,6 +239,12 @@ export function Sidebar({ projects }: { projects: Project[] }) {
               </Button>
             </div>
           </form>
+        )}
+
+        {archiveError && (
+          <p className="mb-2 rounded-md border border-destructive/50 bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
+            {archiveError}
+          </p>
         )}
 
         {activeProjects.length === 0 ? (
@@ -317,15 +343,25 @@ export function Sidebar({ projects }: { projects: Project[] }) {
                       <span className="truncate">{project.name}</span>
                     </Link>
                     {!project.is_inbox && (
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => handleStartEdit(project)}
-                        aria-label={`Edit ${project.name}`}
-                        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Pencil className="size-3" />
-                      </Button>
+                      <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => handleStartEdit(project)}
+                          aria-label={`Edit ${project.name}`}
+                        >
+                          <Pencil className="size-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => handleArchive(project.id)}
+                          disabled={isArchivePending}
+                          aria-label={`Archive ${project.name}`}
+                        >
+                          <Archive className="size-3" />
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </li>

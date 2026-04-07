@@ -108,3 +108,47 @@ export async function updateProject(
   revalidatePath("/dashboard");
   return { error: null };
 }
+
+export async function archiveProject(projectId: string) {
+  if (!projectId || projectId.trim().length === 0) {
+    return { error: "Project ID is required." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in." };
+  }
+
+  // Fetch the project to check if it's the Inbox
+  const { data: project, error: fetchError } = await supabase
+    .from("projects")
+    .select("is_inbox")
+    .eq("id", projectId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (fetchError || !project) {
+    return { error: "Project not found." };
+  }
+
+  if (project.is_inbox) {
+    return { error: "The Inbox project cannot be archived." };
+  }
+
+  const { error } = await supabase
+    .from("projects")
+    .update({ is_archived: true })
+    .eq("id", projectId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { error: "Failed to archive project. Please try again." };
+  }
+
+  revalidatePath("/dashboard");
+  return { error: null };
+}
