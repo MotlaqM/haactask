@@ -6,6 +6,7 @@ import { createDefaultUserData } from "@/lib/default-user-data";
 
 export type AuthResult = {
   error?: string;
+  success?: string;
 };
 
 export async function signUp(formData: FormData): Promise<AuthResult> {
@@ -25,6 +26,14 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
 
   if (error) {
     return { error: error.message };
+  }
+
+  // If no session, email confirmation is required — don't redirect to dashboard
+  if (!data.session) {
+    return {
+      success:
+        "Check your email for a confirmation link to complete your sign-up.",
+    };
   }
 
   // Create default user data (Inbox project) for the new user
