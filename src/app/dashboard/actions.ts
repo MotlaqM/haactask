@@ -87,6 +87,22 @@ export async function updateProject(
     return { error: "You must be signed in." };
   }
 
+  // Prevent renaming/recoloring the Inbox project
+  const { data: project, error: fetchError } = await supabase
+    .from("projects")
+    .select("is_inbox")
+    .eq("id", projectId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (fetchError || !project) {
+    return { error: "Project not found." };
+  }
+
+  if (project.is_inbox) {
+    return { error: "The Inbox project cannot be modified." };
+  }
+
   const updates: Record<string, string> = {};
   if (data.name !== undefined) updates.name = data.name.trim();
   if (data.color !== undefined) updates.color = data.color.trim();
