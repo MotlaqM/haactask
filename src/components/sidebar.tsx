@@ -1,9 +1,23 @@
 "use client";
 
+import { useState, useTransition, useRef } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Inbox, FolderOpen } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Inbox, FolderOpen, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { createProject } from "@/app/dashboard/actions";
+
+const PROJECT_COLORS = [
+  "#ef4444", // red
+  "#f97316", // orange
+  "#eab308", // yellow
+  "#22c55e", // green
+  "#06b6d4", // cyan
+  "#3b82f6", // blue
+  "#8b5cf6", // violet
+  "#ec4899", // pink
+];
 
 type Project = {
   id: string;
@@ -16,7 +30,14 @@ type Project = {
 
 export function Sidebar({ projects }: { projects: Project[] }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const activeProjectId = searchParams.get("project");
+
+  const [showForm, setShowForm] = useState(false);
+  const [selectedColor, setSelectedColor] = useState(PROJECT_COLORS[5]);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const activeProjects = projects
     .filter((p) => !p.is_archived)
@@ -27,6 +48,34 @@ export function Sidebar({ projects }: { projects: Project[] }) {
       return a.position - b.position;
     });
 
+  function handleOpenForm() {
+    setShowForm(true);
+    setError(null);
+    setSelectedColor(PROJECT_COLORS[5]);
+    // Focus the name input after render
+    setTimeout(() => nameInputRef.current?.focus(), 0);
+  }
+
+  function handleCancel() {
+    setShowForm(false);
+    setError(null);
+  }
+
+  async function handleSubmit(formData: FormData) {
+    formData.set("color", selectedColor);
+
+    startTransition(async () => {
+      const result = await createProject(formData);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setShowForm(false);
+        setError(null);
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border bg-muted/30">
       <div className="flex h-12 items-center border-b border-border px-4">
@@ -36,9 +85,70 @@ export function Sidebar({ projects }: { projects: Project[] }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        <p className="mb-1 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Projects
-        </p>
+        <div className="mb-1 flex items-center justify-between px-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Projects
+          </p>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={handleOpenForm}
+            aria-label="New project"
+          >
+            <Plus className="size-3.5" />
+          </Button>
+        </div>
+
+        {showForm && (
+          <form action={handleSubmit} className="mb-2 rounded-md border border-border bg-background p-2">
+            <input
+              ref={nameInputRef}
+              name="name"
+              type="text"
+              placeholder="Project name"
+              required
+              className="mb-2 w-full rounded-md border border-border bg-transparent px-2 py-1 text-sm outline-none focus:border-ring"
+              autoComplete="off"
+            />
+
+            <div className="mb-2 flex flex-wrap gap-1">
+              {PROJECT_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setSelectedColor(color)}
+                  className={cn(
+                    "size-5 rounded-full border-2 transition-transform",
+                    selectedColor === color
+                      ? "scale-110 border-foreground"
+                      : "border-transparent hover:scale-105"
+                  )}
+                  style={{ backgroundColor: color }}
+                  aria-label={`Select color ${color}`}
+                />
+              ))}
+            </div>
+
+            {error && (
+              <p className="mb-2 text-xs text-destructive">{error}</p>
+            )}
+
+            <div className="flex gap-1">
+              <Button type="submit" size="xs" disabled={isPending} className="flex-1">
+                {isPending ? "Creating..." : "Create"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={handleCancel}
+                aria-label="Cancel"
+              >
+                <X className="size-3.5" />
+              </Button>
+            </div>
+          </form>
+        )}
 
         {activeProjects.length === 0 ? (
           <p className="px-2 py-4 text-center text-xs text-muted-foreground">

@@ -1,10 +1,60 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/auth");
+}
+
+export async function createProject(formData: FormData) {
+  const name = formData.get("name") as string | null;
+  const color = formData.get("color") as string | null;
+
+  if (!name || name.trim().length === 0) {
+    return { error: "Project name is required." };
+  }
+
+  if (!color || color.trim().length === 0) {
+    return { error: "Project color is required." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in." };
+  }
+
+  // Get the highest position to place the new project after existing ones
+  const { data: existing } = await supabase
+    .from("projects")
+    .select("position")
+    .eq("user_id", user.id)
+    .order("position", { ascending: false })
+    .limit(1);
+
+  const nextPosition =
+    existing && existing.length > 0 ? existing[0].position + 1 : 0;
+
+  const { error } = await supabase.from("projects").insert({
+    user_id: user.id,
+    name: name.trim(),
+    color: color.trim(),
+    is_inbox: false,
+    is_archived: false,
+    position: nextPosition,
+  });
+
+  if (error) {
+    return { error: "Failed to create project. Please try again." };
+  }
+
+  revalidatePath("/dashboard");
+  return { error: null };
 }
