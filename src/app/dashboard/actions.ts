@@ -58,3 +58,53 @@ export async function createProject(formData: FormData) {
   revalidatePath("/dashboard");
   return { error: null };
 }
+
+export async function updateProject(
+  projectId: string,
+  data: { name?: string; color?: string }
+) {
+  if (!projectId || projectId.trim().length === 0) {
+    return { error: "Project ID is required." };
+  }
+
+  if (data.name !== undefined && data.name.trim().length === 0) {
+    return { error: "Project name cannot be empty." };
+  }
+
+  if (
+    data.color !== undefined &&
+    !/^#[0-9a-fA-F]{6}$/.test(data.color.trim())
+  ) {
+    return { error: "Invalid color value." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in." };
+  }
+
+  const updates: Record<string, string> = {};
+  if (data.name !== undefined) updates.name = data.name.trim();
+  if (data.color !== undefined) updates.color = data.color.trim();
+
+  if (Object.keys(updates).length === 0) {
+    return { error: "No changes provided." };
+  }
+
+  const { error } = await supabase
+    .from("projects")
+    .update(updates)
+    .eq("id", projectId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { error: "Failed to update project. Please try again." };
+  }
+
+  revalidatePath("/dashboard");
+  return { error: null };
+}
